@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#SBATCH --mem=4GB
+#SBATCH --nodes 1
+#SBATCH --ntasks-per-node 12
+#SBATCH --time=02:30:00
+#SBATCH --job-name *job_name*
+#SBATCH --output output.dat
+
+# get job folder and save it in a variable
+export CURR_DIR=*job_directory*
+
+mkdir -p /tmp/*job_name*
+cp *job_directory*/input.inp /tmp/*job_name*/input.inp
+cp *xyz_path* /tmp/*job_name*/input.xyz
+
+cd /tmp/*job_name*
+/mnt/share/public/software/orca-6.0.1/orca input.inp "--bind-to none" > output_*job_name*.out
+
+# rm tmp pro gbw .inp *hess cpcm densities
+cp * $CURR_DIR/output
+
+cd $CURR_DIR
