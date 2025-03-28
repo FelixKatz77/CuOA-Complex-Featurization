@@ -1,13 +1,25 @@
+'''
+This script extracts electronic descriptors from ORCA output files and saves them to a CSV file.
+'''
+
 from morfeus import read_xyz
 from morfeus import XTB
 import pandas as pd
 import json
 from pathlib import Path
 import re
+from pymatgen.io.xyz import XYZ
+from utils import find_atom_id
+import numpy as np
 
 jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
 
 def get_charge(filepath):
+
+    '''
+    Get charge from ORCA input file
+    '''
+
     with open(filepath, 'r') as file:
         for line in file:
             if "*xyzfile" in line:
@@ -18,12 +30,6 @@ def get_charge(filepath):
 def parse_orbital_energies(filepath):
     """
     Parse orbital energies section from an ORCA output file.
-
-    Parameters:
-    filepath (str): Path to the ORCA output file
-
-    Returns:
-    pd.DataFrame: DataFrame containing orbital energies data
     """
     orbital_data = []
     reading_orbitals = False
@@ -136,6 +142,22 @@ def get_mol_desc(properties_dict):
     polarizability = properties_dict['Polarizability']['ISOTROPICPOLAR']
     return {'Dipole': dipole_moment, 'Polarizability': polarizability}
 
+def identify_phenyl_carbon(xyz_path):
+    cu_id = find_atom_id(xyz_path, 'Cu')
+    mol = XYZ.from_file(xyz_path).molecule
+    cu_coords = mol.sites[cu_id].coords
+    neighbors = []
+    for i, site in enumerate(mol.sites):
+        if i != cu_id:  # Skip self
+            if site.species_string == 'C':  # Only look at O and N
+                dist = np.linalg.norm(cu_coords - site.coords)
+                neighbors.append((i, site.species_string, dist))
+
+    # Sort by distance and get closest
+    neighbors.sort(key=lambda x: x[2])
+    closest = neighbors[:1]
+    return closest[0]
+
 def get_charge_desc(properties_dict):
     '''Extract charge descriptors for Cu and Br from ORCA output'''
 
@@ -153,25 +175,108 @@ def get_charge_desc(properties_dict):
     return {'Mayer Bond Order Cu-Br': mayer_bo_ord, 'Muliken Charge Br': mulliken_charge_br,
             'Mulliken Charge Cu': mulliken_charge_cu}
 
+
+def extract_npa_table(file_path):
+    """
+    Extract the Natural Population Analysis table from an orca output file and convert it to a pandas DataFrame.
+    """
+    # Initialize variables
+    table_found = False
+    table_ended = False
+    table_lines = []
+
+    # Read the file and extract table lines
+    with open(file_path, 'r') as file:
+        for line in file:
+            # Check for the start of the table
+            if "Summary of Natural Population Analysis:" in line:
+                table_found = True
+                continue
+
+            # Skip header lines
+            if table_found and "Natural Population" in line:
+                continue
+            if table_found and "Natural" in line and "Core" in line:
+                continue
+            if table_found and "---" in line:
+                continue
+
+            # Collect data lines
+            if table_found and not table_ended and line.strip():
+                # Check if we've reached the end of the table
+                if "====" in line:
+                    table_ended = True
+                    continue
+
+                # Skip the Total line
+                if "* Total *" in line:
+                    continue
+
+                # Add the line to our collection
+                table_lines.append(line.strip())
+
+    # If no table was found, return empty DataFrame
+    if not table_found or not table_lines:
+        return pd.DataFrame()
+
+    # Parse the table lines into a list of dictionaries
+    data = []
+    for line in table_lines:
+        # Use regex to extract values from each line
+        match = re.search(r'(\w+)\s+(\d+)\s+([-]?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)', line)
+        if match:
+            atom, atom_no, charge, core, valence, rydberg, total = match.groups()
+            data.append({
+                'Atom': atom,
+                'No': int(atom_no),
+                'Natural Charge': float(charge),
+                'Core': float(core),
+                'Valence': float(valence),
+                'Rydberg': float(rydberg),
+                'Total': float(total)
+            })
+
+    # Create DataFrame from the parsed data
+    df = pd.DataFrame(data)
+
+    return df
+
+def get_nbo_energies(output_file, xyz_file):
+    '''Extract NBO energies from ORCA output'''
+
+    npa_df = extract_npa_table(output_file)
+    phenyl_c_id = identify_phenyl_carbon(xyz_file)
+    cu_natural_charge = npa_df[npa_df['Atom'] == 'Cu']['Natural Charge'].values[0]
+    br_natural_charge = npa_df[npa_df['Atom'] == 'Br']['Natural Charge'].values[0]
+    c_natural_charge = npa_df[npa_df['No'] == phenyl_c_id+1]['Natural Charge'].values[0]
+    return {'Cu Natural Charge': cu_natural_charge, 'Br Natural Charge': br_natural_charge, 'C Natural Charge': c_natural_charge}
+
 if __name__ == '__main__':
-    name = "L1"
-    species = "CuBr"
-    job_type = "Ensemble_Opt"
-    ensemble_path = jobs_path.joinpath(name, job_type, f"{name}_{species}_{job_type}")
-    steric_descriptors = {}
-    for conformer_dir in ensemble_path.glob('conformer_*'):
-        conf_no = conformer_dir.name.split('_')[-1]
-        input_path = conformer_dir.joinpath("output", 'input.inp')
-        txt_path = conformer_dir.joinpath("output", f'output_{name}_{species}_{job_type}_conf{conf_no}.out')
-        json_path = conformer_dir.joinpath("output", 'input.property.json')
-        orca_dict = json.loads(json_path.read_text())
-        property_dict = orca_dict[f'Geometry_{len(orca_dict)-1}']
-        charge = get_charge(input_path)
-        orb_desc = get_front_orb_derived_descriptors(txt_path)
-        fukui_desc = calc_fukui_descriptors(conformer_dir.joinpath('output', 'input.xyz'), charge=charge)
-        mol_desc = get_mol_desc(property_dict)
-        charge_desc = get_charge_desc(property_dict)
-        elec_desc = {**orb_desc, **fukui_desc, **mol_desc, **charge_desc}
-        desc_df = pd.DataFrame(elec_desc).T
-        pass
+    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
+    species = "CuOA"
+    for ligand_dir in jobs_dir.iterdir():
+        ligand_name = ligand_dir.name  # ligand_name of the ligand
+        ensemble_path = jobs_path.joinpath(ligand_name, "Ensemble_Opt",
+                                           f"{ligand_name}_{species}_Ensemble_Opt")  # Path to ensemble directory
+        steric_descriptors = {}
+        for conformer_dir in ensemble_path.glob('conformer_*'):
+            conf_no = conformer_dir.ligand_name.split('_')[-1]
+            input_path = conformer_dir.joinpath("output", 'input.inp')
+            txt_path = conformer_dir.joinpath("output", f'output_{ligand_name}_{species}_Ensemble_Opt_conf{conf_no}.out')
+            json_path = conformer_dir.joinpath("output", 'input.property.json')
+            orca_dict = json.loads(json_path.read_text())
+            property_dict = orca_dict[f'Geometry_{len(orca_dict)-1}']
+            charge = get_charge(input_path)
+            orb_desc = get_front_orb_derived_descriptors(txt_path)
+            fukui_desc = calc_fukui_descriptors(conformer_dir.joinpath('output', 'input.xyz'), charge=charge)
+            mol_desc = get_mol_desc(property_dict)
+            charge_desc = get_charge_desc(property_dict)
+            nbo_desc = get_nbo_energies(txt_path, conformer_dir.joinpath('output', 'input.xyz'))
+            elec_desc = {**orb_desc, **fukui_desc, **mol_desc, **charge_desc}
+            desc_df = pd.DataFrame(elec_desc).T
+
+            # Save DataFrame to CSV
+            desc_dir = jobs_path.joinpath(ligand_name, 'electronic_descriptors')
+            Path.mkdir(desc_dir, exist_ok=False)
+            desc_df.to_csv(desc_dir.joinpath(f"{ligand_name}_{species}_electronic_descriptors.csv"))
 

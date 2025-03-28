@@ -1,11 +1,17 @@
+'''
+This script calculates steric descriptors from ORCA output files and saves them to a CSV file.
+'''
+
+
 import json
 from pathlib import Path
 
 import dbstep.Dbstep as db
 import numpy as np
 import pandas as pd
-from morfeus import BiteAngle, read_xyz
+from morfeus import BiteAngle, read_xyz, Dispersion
 from pymatgen.io.xyz import XYZ
+from utils import read_energy
 
 jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
 
@@ -31,20 +37,6 @@ def calculate_boltzmann_average(df, energy_col='Energy', T=298.15):
         boltz_averages[col] = np.sum(df[col] * weights)
 
     return pd.Series(boltz_averages), weights
-
-
-def read_energy(filename):
-    '''Read the energy from an ORCA output file and add thermal corrections'''
-
-    orca_output = json.loads(filename.read_text())
-    for geometry in orca_output.keys():
-        if 'THERMOCHEMISTRY_Energies' in orca_output[geometry]:
-            final_eel = orca_output[geometry]['DFT_Energy']['FINALEN']
-            gibb_e = orca_output[geometry]['THERMOCHEMISTRY_Energies']['FREEENERGYG']
-            eel = orca_output[geometry]['THERMOCHEMISTRY_Energies']['ELENERGY']
-            thermal_corr_gibbs = gibb_e - eel
-            return final_eel + thermal_corr_gibbs
-    return None
 
 
 def find_atom_ids(xyz_path, element1, element2):
@@ -81,9 +73,20 @@ def find_coordinating_atom_ids(xyz_path, cu_id):
     # Sort by distance and get two closest
     neighbors.sort(key=lambda x: x[2])
     closest_two = neighbors[:2]
-    ids = [neighbor[0] for neighbor in neighbors]
+    ids = [neighbor[0] for neighbor in closest_two]
     return ids
 
+def calculate_lig_cu_bond_length(xyz_file, cu_id, coord_ids):
+    '''Calculate the bond length between Cu and a coordinating ligand atom'''
+
+    coord_id_1 = coord_ids[0] + 1
+    coord_id_2 = coord_ids[1] + 1
+    cu_id += 1
+    elements, coordinates = read_xyz(xyz_file)
+    bond_length_1 = np.linalg.norm(coordinates[cu_id] - coordinates[coord_id_1])
+    bond_length_2 = np.linalg.norm(coordinates[cu_id] - coordinates[coord_id_2])
+    avg_bond_length = (bond_length_1 + bond_length_2) / 2
+    return avg_bond_length
 
 def calculate_steric_descriptors(xyz_file, cu_id, br_id, coord_id1, coord_id2):
     '''Calculate sterimol, buried volume and bite angle descriptors for a Cu-Br complex'''
@@ -103,39 +106,56 @@ def calculate_steric_descriptors(xyz_file, cu_id, br_id, coord_id1, coord_id2):
     return {'L': sterimol_L.L, 'Bmin': sterimol_B.Bmin, 'Bmax': sterimol_B.Bmax, 'BurVol': bur_v.bur_vol,
             'BiteAngle': bite_angle}
 
+def calculate_dispersion(xyz_file):
+    '''Calculate the dispersion descriptor'''
+
+    elements, coordinates = read_xyz(xyz_file)
+    disp = Dispersion(elements, coordinates, compute_coefficients=False)
+    disp.compute_coefficients(model="gd4")
+    #disp.surface_from_cube("corannulene.cub")
+    disp.compute_p_int()
+    p_int = disp.p_int
+    p_min = disp.p_min
+    p_max = disp.p_max
+    return {'p_int': p_int, 'p_min': p_min, 'p_max': p_max}
 
 if __name__ == '__main__':
-    name = "L1"  # name of the ligand
-    species = "CuBr"  # species
-    job_type = "Ensemble_Opt"  # job type
-    ensemble_path = jobs_path.joinpath(name, job_type, f"{name}_{species}_{job_type}")  # Path to ensemble directory
+    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
+    species = "CuOA"
+    for ligand_dir in jobs_dir.iterdir():
+        ligand_name = ligand_dir.name  # ligand_name of the ligand
+        ensemble_path = jobs_path.joinpath(ligand_name, "Ensemble_Opt", f"{ligand_name}_{species}_Ensemble_Opt")  # Path to ensemble directory
 
-    steric_descriptors = {}
+        steric_descriptors = {}
 
-    # Loop over all conformers in the ensemble
-    for conformer_dir in ensemble_path.glob('conformer_*'):
-        energy = read_energy(conformer_dir.joinpath("output", 'input.property.json'))  # Read energy from ORCA output
-        xyz_path = conformer_dir.joinpath("output", 'input.xyz')  # Path to XYZ file
+        # Loop over all conformers in the ensemble
+        for conformer_dir in ensemble_path.glob('conformer_*'):
+            energy = read_energy(conformer_dir.joinpath("output", 'input.property.json'),
+                                 conformer_dir.joinpath("output",
+                                                        'input_job2.property.json'))  # Read energy from ORCA output
+            xyz_path = conformer_dir.joinpath("output", 'input.xyz')  # Path to XYZ file
 
-        cu_id, br_id = find_atom_ids(xyz_path, 'Cu', 'Br')  # Find atom IDs of Cu and Br
-        coord_ids = find_coordinating_atom_ids(xyz_path, cu_id)  # Find atom IDs of coordinating atoms
+            cu_id, br_id = find_atom_ids(xyz_path, 'Cu', 'Br')  # Find atom IDs of Cu and Br
+            coord_ids = find_coordinating_atom_ids(xyz_path, cu_id)  # Find atom IDs of coordinating atoms
 
-        sterics = calculate_steric_descriptors(conformer_dir.joinpath('output', 'input.xyz'), cu_id, br_id,
-                                               coord_ids[0], coord_ids[1]) # Calculate steric descriptors
-        sterics['Energy'] = energy # Add energy to dictionary
-        steric_descriptors[conformer_dir.name] = sterics # Add to descriptor dictionary
+            sterics = calculate_steric_descriptors(conformer_dir.joinpath('output', 'input.xyz'), cu_id, br_id,
+                                                   coord_ids[0], coord_ids[1]) # Calculate steric descriptors
+            dispersion_desc = calculate_dispersion(conformer_dir.joinpath('output', 'input.xyz')) # Calculate dispersion descriptors
+            sterics.update(dispersion_desc) # Add dispersion descriptors
+            sterics['Energy'] = energy # Add energy to dictionary
+            steric_descriptors[conformer_dir.ligand_name] = sterics # Add to descriptor dictionary
 
-    desc_df = pd.DataFrame(steric_descriptors).T # Convert dictionary to DataFrame
+        desc_df = pd.DataFrame(steric_descriptors).T # Convert dictionary to DataFrame
 
-    boltz_avg, weights = calculate_boltzmann_average(desc_df) # Calculate Boltzmann average
-    min_values = desc_df.min() # Get minimum values
-    max_values = desc_df.max() # Get maximum values
+        boltz_avg, weights = calculate_boltzmann_average(desc_df) # Calculate Boltzmann average
+        min_values = desc_df.min() # Get minimum values
+        max_values = desc_df.max() # Get maximum values
 
-    stat = pd.concat([min_values, max_values, boltz_avg], axis=1, keys=['Min', 'Max', 'Boltzmann Average']) # Concat averages, min and max
-    desc_df = pd.concat([desc_df, stat.T], axis=0) # Add values to DataFrame
+        stat = pd.concat([min_values, max_values, boltz_avg], axis=1, keys=['Min', 'Max', 'Boltzmann Average']) # Concat averages, min and max
+        desc_df = pd.concat([desc_df, stat.T], axis=0) # Add values to DataFrame
 
-    # Save DataFrame to CSV
-    desc_dir = jobs_path.joinpath(name, 'steric_descriptors')
-    Path.mkdir(desc_dir, exist_ok=False)
-    desc_df.to_csv(desc_dir.joinpath(f"{name}_{species}_steric_descriptors.csv"))
+        # Save DataFrame to CSV
+        desc_dir = jobs_path.joinpath(ligand_name, 'steric_descriptors')
+        Path.mkdir(desc_dir, exist_ok=False)
+        desc_df.to_csv(desc_dir.joinpath(f"{ligand_name}_{species}_steric_descriptors.csv"))
 
