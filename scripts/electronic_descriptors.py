@@ -2,17 +2,20 @@
 This script extracts electronic descriptors from ORCA output files and saves them to a CSV file.
 '''
 
-from morfeus import read_xyz
-from morfeus import XTB
+#from morfeus import read_xyz
+#from morfeus import XTB
 import pandas as pd
 import json
 from pathlib import Path
 import re
 from pymatgen.io.xyz import XYZ
-from utils import find_atom_id
+from scripts.utils import find_atom_id, run_command, extract_floats
 import numpy as np
+import os
+import re
 
 jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
+MULTIWFN_PATH = "/home/skopf/tools/Multiwfn_3.7_bin_Linux/Multiwfn"
 
 def get_charge(filepath):
 
@@ -251,6 +254,90 @@ def get_nbo_energies(output_file, xyz_file):
     c_natural_charge = npa_df[npa_df['No'] == phenyl_c_id+1]['Natural Charge'].values[0]
     return {'Cu Natural Charge': cu_natural_charge, 'Br Natural Charge': br_natural_charge, 'C Natural Charge': c_natural_charge}
 
+def calculate_laplacian_bond_order(molden_filepath, xyz_filepath, threads = 12):
+    """Calculate the Laplacian Bond Order (LBO) based on https://doi.org/10.1021/jp4010345 for Cu-C, Cu-Br, and Cu-ligand bonds. """
+    
+    # Get relevant indexes 
+    xyz_path = Path(xyz_filepath)
+    mol = XYZ.from_file(xyz_path).molecule
+    phenyl_c_id, phenylsym, dist = identify_phenyl_carbon(xyz_path)
+    if phenylsym != "C":
+        raise ValueError("The phenyl carbon symbol is not carbon, something is wrong.")
+    cu_id = find_atom_id(xyz_path, 'Cu')
+    br_id = find_atom_id(xyz_path, 'Br')
+    natoms = len(mol)
+
+    # Run multiwfn
+    cmd = f"echo -e '9\n8\ny\n0\nq\nq\n' | {MULTIWFN_PATH} {molden_filepath} -nt {threads}"
+    output, errors = run_command(cmd)
+    multiwfn_out = output.splitlines()
+
+    # Check if file exists
+    if not os.path.exists("bndmat.txt"):
+        raise FileNotFoundError("The bndmat.txt file was not created. Check the Multiwfn output.")
+    with open("bndmat.txt", "r") as f:
+        lines = f.readlines()
+
+    # Compile output file into matrix
+    lbo_mat = np.zeros((natoms, natoms))
+    row = 0
+    col = 0
+
+    for line in lines:
+        floats = extract_floats(line)
+        num_floats = len(floats)
+
+        if num_floats == 0:
+            continue
+
+        lbo_mat[row, col:col + num_floats] = floats
+
+        row += 1
+        if row == natoms:
+            col += num_floats
+            row = 0
+
+    # Check if the matrix is symmetric
+    is_symmetric = np.allclose(lbo_mat, lbo_mat.T)
+    if not is_symmetric:
+        raise ValueError("The LBO matrix is not symmetric, error when parsing matrix.")
+    
+    # Get LBO values
+    cu_br_lbo = lbo_mat[cu_id, br_id]
+    cu_c_lbo = lbo_mat[cu_id, phenyl_c_id]
+
+    cu_x_lbo = lbo_mat[cu_id, :]
+    top_indexes = np.argsort(cu_x_lbo)[-5:] # Get top 5 (Cu, Br, C, 2x ligand)
+    largest_bond_orders_dict = {i: cu_x_lbo[i] for i in top_indexes}
+
+    for key in [phenyl_c_id, br_id, cu_id]: # Remove Cu, Br, C as not needed
+        if key in largest_bond_orders_dict:
+            del largest_bond_orders_dict[key]
+
+    # Check that the presumed ligand coordinating atoms are N or O
+    coordinating_atoms_n_o = all([atomic_num in [7, 8] for atomic_num in [mol.atomic_numbers[key] for key in largest_bond_orders_dict.keys()]])
+
+    if not coordinating_atoms_n_o:
+        raise ValueError("The largest bond orders do not correspond to N or O atoms, check matrix parsing and structure")
+    
+    total_ligand_lbo = sum(largest_bond_orders_dict.values())
+    average_ligand_lbo = np.mean(list(largest_bond_orders_dict.values()))
+
+
+    os.remove("bndmat.txt")
+
+    return {
+    "Cu-C LBO": cu_c_lbo,
+    "Cu-Br LBO": cu_br_lbo,
+    "Total Cu-ligand LBO": total_ligand_lbo,
+    "Average Cu-ligand LBO": average_ligand_lbo,
+    "Largest Bond Orders": largest_bond_orders_dict}
+
+
+    
+
+
+
 if __name__ == '__main__':
     jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
     species = "CuOA"
@@ -272,8 +359,13 @@ if __name__ == '__main__':
             mol_desc = get_mol_desc(property_dict)
             charge_desc = get_charge_desc(property_dict)
             nbo_desc = get_nbo_energies(txt_path, conformer_dir.joinpath('output', 'input.xyz'))
-            elec_desc = {**orb_desc, **fukui_desc, **mol_desc, **charge_desc}
+            lbo_desc = calculate_laplacian_bond_order(conformer_dir.joinpath('output', 'input.molden.input'),
+                                            conformer_dir.joinpath('output', 'input.xyz'))
+            elec_desc = {**orb_desc, **fukui_desc, **mol_desc, **charge_desc, **lbo_desc}
             desc_df = pd.DataFrame(elec_desc).T
+
+            
+
 
             # Save DataFrame to CSV
             desc_dir = jobs_path.joinpath(ligand_name, 'electronic_descriptors')
