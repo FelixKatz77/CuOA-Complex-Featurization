@@ -2,6 +2,8 @@ from pathlib import Path
 from rdkit import Chem
 import json
 import pandas as pd
+import subprocess
+import re
 
 def create_dirs(name, job_type, species, jobs_path, output=True):
 
@@ -212,4 +214,22 @@ def check_optimization_success(filename):
             return False
         else:
             return True
+        
+def run_command(cmd, cwd = None, shell = True):
+    """
+    Run a command in the shell and return the output.
+    """
+    result = subprocess.run(
+        cmd,
+        shell=shell,
+        cwd=cwd,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout, result.stderr
 
+def extract_floats(line):
+    """In a line of text, extract all numbers that include a decimal"""
+    float_pattern = r"[-+]?\d*\.\d+"
+    matches = re.findall(float_pattern, line)
+    return [float(match) for match in matches]
