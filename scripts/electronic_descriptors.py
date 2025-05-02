@@ -331,7 +331,7 @@ def calculate_laplacian_bond_order(molden_filepath, xyz_filepath, threads = 12):
     "Cu-Br LBO": cu_br_lbo,
     "Total Cu-ligand LBO": total_ligand_lbo,
     "Average Cu-ligand LBO": average_ligand_lbo,
-    "Largest Bond Orders": largest_bond_orders_dict}
+    "Largest Bond Orders": [largest_bond_orders_dict]}
 
 
     
