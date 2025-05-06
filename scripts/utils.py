@@ -12,6 +12,8 @@ import pandas as pd
 from pymatgen.io.xyz import XYZ
 from openbabel import pybel
 from openbabel import openbabel
+import subprocess
+import re
 
 def dir_empty(dir_path):
     path = Path(dir_path)
@@ -238,7 +240,27 @@ def check_optimization_success(filename, verbose=False):
             if verbose:
                 print(f"Optimization failed for {filename}.")
             return True
+        
+def run_command(cmd, cwd = None, shell = True):
+    """
+    Run a command in the shell and return the output.
+    """
+    result = subprocess.run(
+        cmd,
+        shell=shell,
+        cwd=cwd,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout, result.stderr
 
+
+def extract_floats(line):
+    """In a line of text, extract all numbers that include a decimal"""
+    float_pattern = r"[-+]?\d*\.\d+"
+    matches = re.findall(float_pattern, line)
+    return [float(match) for match in matches]
+    
 def find_coordinating_atom_ids(xyz_path, cu_id):
     '''Find the atom IDs of the two N or O atoms closest to a given atom in an XYZ file'''
 
