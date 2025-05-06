@@ -9,10 +9,9 @@ import json
 from pathlib import Path
 import re
 from pymatgen.io.xyz import XYZ
-from utils import find_atom_id
+from utils import find_atom_id, find_coordinating_atom_ids
 import numpy as np
 
-jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
 
 def get_charge(filepath):
 
@@ -245,22 +244,27 @@ def get_nbo_energies(output_file, xyz_file):
     '''Extract NBO energies from ORCA output'''
 
     npa_df = extract_npa_table(output_file)
+    cu_id = find_atom_id(xyz_file, 'Cu')
     phenyl_c_id = identify_phenyl_carbon(xyz_file)
+    coord1, coord2 = find_coordinating_atom_ids(cu_id, xyz_file)
     cu_natural_charge = npa_df[npa_df['Atom'] == 'Cu']['Natural Charge'].values[0]
     br_natural_charge = npa_df[npa_df['Atom'] == 'Br']['Natural Charge'].values[0]
     c_natural_charge = npa_df[npa_df['No'] == phenyl_c_id+1]['Natural Charge'].values[0]
-    return {'Cu Natural Charge': cu_natural_charge, 'Br Natural Charge': br_natural_charge, 'C Natural Charge': c_natural_charge}
+    coord1_natural_charge = npa_df[npa_df['No'] == coord1+1]['Natural Charge'].values[0]
+    coord2_natural_charge = npa_df[npa_df['No'] == coord2+1]['Natural Charge'].values[0]
+    return {'Cu Natural Charge': cu_natural_charge, 'Br Natural Charge': br_natural_charge,
+            'C_Phenyl Natural Charge': c_natural_charge, 'Coord1_Natural_Charge': coord1_natural_charge,
+            'Coord2_Natural_Charge': coord2_natural_charge}
 
 if __name__ == '__main__':
-    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
+    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
     species = "CuOA"
     for ligand_dir in jobs_dir.iterdir():
         ligand_name = ligand_dir.name  # ligand_name of the ligand
-        ensemble_path = jobs_path.joinpath(ligand_name, "Ensemble_Opt",
+        ensemble_path = jobs_dir.joinpath(ligand_name, "Ensemble_Opt",
                                            f"{ligand_name}_{species}_Ensemble_Opt")  # Path to ensemble directory
-        steric_descriptors = {}
         for conformer_dir in ensemble_path.glob('conformer_*'):
-            conf_no = conformer_dir.ligand_name.split('_')[-1]
+            conf_no = conformer_dir.name.split('_')[-1]
             input_path = conformer_dir.joinpath("output", 'input.inp')
             txt_path = conformer_dir.joinpath("output", f'output_{ligand_name}_{species}_Ensemble_Opt_conf{conf_no}.out')
             json_path = conformer_dir.joinpath("output", 'input.property.json')
@@ -268,7 +272,7 @@ if __name__ == '__main__':
             property_dict = orca_dict[f'Geometry_{len(orca_dict)-1}']
             charge = get_charge(input_path)
             orb_desc = get_front_orb_derived_descriptors(txt_path)
-            fukui_desc = calc_fukui_descriptors(conformer_dir.joinpath('output', 'input.xyz'), charge=charge)
+            fukui_desc = calc_fukui_descriptors(ligand_dir.joinpath('NBO', f"{ligand_name}_{species}_NBO", f"conformer_{conf_no}", 'output', 'input.log'), charge=charge)
             mol_desc = get_mol_desc(property_dict)
             charge_desc = get_charge_desc(property_dict)
             nbo_desc = get_nbo_energies(txt_path, conformer_dir.joinpath('output', 'input.xyz'))
@@ -276,7 +280,7 @@ if __name__ == '__main__':
             desc_df = pd.DataFrame(elec_desc).T
 
             # Save DataFrame to CSV
-            desc_dir = jobs_path.joinpath(ligand_name, 'electronic_descriptors')
+            desc_dir = jobs_dir.joinpath(ligand_name, 'electronic_descriptors')
             Path.mkdir(desc_dir, exist_ok=False)
             desc_df.to_csv(desc_dir.joinpath(f"{ligand_name}_{species}_electronic_descriptors.csv"))
 

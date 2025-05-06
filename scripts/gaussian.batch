@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#SBATCH --mem=*memory*
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node *tasks_per_node*
+#SBATCH --partition CPU
+#SBATCH --time=48:00:00
+#SBATCH --job-name *job_name*
+#SBATCH --output output.dat
+
+# get job folder and save it in a variable
+export g16root=/mnt/share/public/software/g16_felix
+export GAUSS_EXEDIR=$g16root
+export GAUSS_SCRDIR=/mnt/share/public/software/g16_felix/
+export CURR_DIR=*job_directory*
+
+mkdir -p /tmp/*job_name*
+cp *job_directory*/input.gjf /tmp/*job_name*/input.gjf
+cd /tmp/*job_name*
+
+/mnt/share/public/software/g16_felix/g16 input.gjf > output_*job_name*.out
+cp * $CURR_DIR/output
+cd $CURR_DIR

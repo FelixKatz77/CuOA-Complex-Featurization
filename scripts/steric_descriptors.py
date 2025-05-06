@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from morfeus import BiteAngle, read_xyz, Dispersion
 from pymatgen.io.xyz import XYZ
-from utils import read_energy
+from utils import read_energy, check_orca_success, check_optimization_success, check_neg_frequencies, find_coordinating_atom_ids, find_atom_id
 
 jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/")
 
@@ -39,43 +39,6 @@ def calculate_boltzmann_average(df, energy_col='Energy', T=298.15):
     return pd.Series(boltz_averages), weights
 
 
-def find_atom_ids(xyz_path, element1, element2):
-    '''Find the atom IDs of two elements in an XYZ file'''
-
-    input_text = xyz_path.read_text()
-    lines = input_text.strip().split('\n')
-    br_id = None
-    cu_id = None
-    if element1 not in input_text or element2 not in input_text:
-        raise ValueError(f"Atom {element1} or {element2} not found in {xyz_path}")
-    # Skip the first two lines (header)
-    for i, line in enumerate(lines[2:], start=0):
-        if line.strip().startswith(element1):
-            atom1_id = i
-        elif line.strip().startswith(element2):
-            atom2_id = i
-
-    return atom1_id, atom2_id
-
-
-def find_coordinating_atom_ids(xyz_path, cu_id):
-    '''Find the atom IDs of the two N or O atoms closest to a given atom in an XYZ file'''
-
-    mol = XYZ.from_file(xyz_path).molecule
-    cu_coords = mol.sites[cu_id].coords
-    neighbors = []
-    for i, site in enumerate(mol.sites):
-        if i != cu_id:  # Skip self
-            if site.species_string in ['O', 'N']:  # Only look at O and N
-                dist = np.linalg.norm(cu_coords - site.coords)
-                neighbors.append((i, site.species_string, dist))
-
-    # Sort by distance and get two closest
-    neighbors.sort(key=lambda x: x[2])
-    closest_two = neighbors[:2]
-    ids = [neighbor[0] for neighbor in closest_two]
-    return ids
-
 def calculate_lig_cu_bond_length(xyz_file, cu_id, coord_ids):
     '''Calculate the bond length between Cu and a coordinating ligand atom'''
 
@@ -100,7 +63,7 @@ def calculate_steric_descriptors(xyz_file, cu_id, br_id, coord_id1, coord_id2):
                            measure='classic')
     sterimol_B = db.dbstep(str(xyz_file), atom1=br_id, atom2=cu_id, commandline=True, verbose=True, sterimol=True,
                            measure='classic')
-    bur_v = db.dbstep(str(xyz_file), atom1=br_id, commandline=True, verbose=True, volume=True, measure='classic')
+    bur_v = db.dbstep(str(xyz_file), atom1=cu_id, commandline=True, verbose=True, volume=True, measure='classic')
     bite_angle = BiteAngle(coordinates, cu_id, coord_id1, coord_id2).angle
     # TODO: Add Pyramidalization
     return {'L': sterimol_L.L, 'Bmin': sterimol_B.Bmin, 'Bmax': sterimol_B.Bmax, 'BurVol': bur_v.bur_vol,
@@ -135,7 +98,8 @@ if __name__ == '__main__':
                                                         'input_job2.property.json'))  # Read energy from ORCA output
             xyz_path = conformer_dir.joinpath("output", 'input.xyz')  # Path to XYZ file
 
-            cu_id, br_id = find_atom_ids(xyz_path, 'Cu', 'Br')  # Find atom IDs of Cu and Br
+            cu_id = find_atom_id(xyz_path, 'Cu')  # Find atom IDs of Cu and Br
+            br_id = find_atom_id(xyz_path, 'Br')
             coord_ids = find_coordinating_atom_ids(xyz_path, cu_id)  # Find atom IDs of coordinating atoms
 
             sterics = calculate_steric_descriptors(conformer_dir.joinpath('output', 'input.xyz'), cu_id, br_id,
