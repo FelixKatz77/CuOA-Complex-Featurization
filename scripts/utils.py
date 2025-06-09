@@ -90,13 +90,15 @@ def write_orca_input(dir, job_name, **kwargs):
     with open(dir.joinpath("input.inp"), "w") as f:
         f.write(orca_input)
 
-def write_batch_file(job_name, job_directory, xyz_path, memory='4GB', tasks_per_node=12, template='submit.batch'):
+def write_batch_file(job_name, job_directory, xyz_path, memory='4GB', tasks_per_node=12, template='submit.batch', molden=False):
     batch_file = Path(template).read_text()
     batch_file = batch_file.replace('*job_name*', str(job_name))
     batch_file = batch_file.replace('*job_directory*', str(job_directory))
     batch_file = batch_file.replace('*xyz_path*', str(xyz_path))
     batch_file = batch_file.replace('*memory*', memory)
     batch_file = batch_file.replace('*tasks_per_node*', str(tasks_per_node))
+    if molden:
+        batch_file = batch_file.replace('# placeholder for molden file generation', "/mnt/share/public/software/orca-6.0.1/orca_2mkl input -molden")
     Path(job_directory.joinpath("submit.batch")).write_text(batch_file)
 
 def is_transition_metal(at):
@@ -261,8 +263,8 @@ def extract_floats(line):
     matches = re.findall(float_pattern, line)
     return [float(match) for match in matches]
     
-def find_coordinating_atom_ids(xyz_path, cu_id):
-    '''Find the atom IDs of the two N or O atoms closest to a given atom in an XYZ file'''
+def find_coordinating_atom_ids(cu_id, xyz_path):
+    '''Find the atom IDs of the two N or O atoms closest to a given atom in an XYZ file. IDs are 0-indexed.'''
 
     mol = XYZ.from_file(xyz_path).molecule
     cu_coords = mol.sites[cu_id].coords
@@ -378,11 +380,13 @@ def extract_elements_and_coordinates(xyz_file):
     return '\n'.join(formatted_lines)
 
 
-def write_gaussian_input(dir, job_name, xyz_path, charge):
+def write_gaussian_input(dir, job_name, xyz_path, charge, nprocs=12):
     """Write Gaussian input file for NBO analysis"""
     coordinates = extract_elements_and_coordinates(xyz_path)
-    gaussian_input = f'%mem=10000MB\n%nprocshared=12\n#p TPSSTPSS/def2TZVP pop=nbo\n\n{job_name}\n\n{charge} 2\n'
-    gaussian_input += f'{coordinates}\n\n\n'
+    gaussian_input = f'%mem=12000MB\n%nprocshared={nprocs}\n#p TPSSTPSS/def2TZVP scf=XQC pop=(nbo6,hirshfeld,saveNBO)\n\n{job_name}\n\n{charge} 2\n'
+    gaussian_input += f'{coordinates}\n\n'
+    gaussian_input += '$NBO NRT $END\n\n'
+
     with open(dir.joinpath("input.gjf"), "w") as f:
         f.write(gaussian_input)
 

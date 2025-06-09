@@ -17,7 +17,7 @@ cp *xyz_path* /tmp/*job_name*/input.xyz
 
 cd /tmp/*job_name*
 /mnt/share/public/software/orca-6.0.1/orca input.inp "--bind-to none" > output_*job_name*.out
-/mnt/share/public/software/orca-6.0.1/orca_2mkl input -molden
+# placeholder for molden file generation
 
 # rm tmp pro gbw .inp *hess cpcm densities
 cp * $CURR_DIR/output

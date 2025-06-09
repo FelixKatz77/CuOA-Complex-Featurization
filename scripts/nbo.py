@@ -11,7 +11,7 @@ if __name__ == '__main__':
     ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
     species = "CuOA"
     for ligand_dir in jobs_dir.iterdir():
-        if ligand_dir.is_dir():
+        if ligand_dir.is_dir(): # and ligand_dir.name in ["L31", "L32"]:  # Specify the ligands you want to process
             ligand_name = ligand_dir.name  # ligand_name of the ligand
         else:
             continue

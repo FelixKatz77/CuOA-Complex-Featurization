@@ -11,12 +11,13 @@ from rdkit.Chem.rdmolfiles import MolFromSmiles
 
 from utils import create_dirs, write_orca_input, write_batch_file
 
-species = 'CuOA'
+species = 'Ligand'
 jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
 
 ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
 for xyz_file in Path("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/geometries/input/").glob("*.xyz"):
     ligand_name = xyz_file.stem
+    #if ligand_name in ['L31', 'L32']:
     ligand_info = ligands_info[ligands_info["name"] == ligand_name]
     if species == "Ligand":
         charge = ligand_info["charge_ligand"].values[0]

@@ -36,11 +36,11 @@ def parse_conformers(input_text):
 
 def main():
     n_jobs = 0
-    species = 'CuOA'
+    species = 'Ligand'
     ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
     jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
     for ligand_dir in jobs_dir.iterdir():
-        if ligand_dir.is_dir():
+        if ligand_dir.is_dir(): #and ligand_dir.name in ["L31", "L32"]:
             ligand_name = ligand_dir.name
             ligand_info = ligands_info[ligands_info["name"] == ligand_name]
             if species == "Ligand":

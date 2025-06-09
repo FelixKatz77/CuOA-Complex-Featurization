@@ -12,6 +12,8 @@
 export g16root=/mnt/share/public/software/g16_felix
 export GAUSS_EXEDIR=$g16root
 export GAUSS_SCRDIR=/mnt/share/public/software/g16_felix/
+export NBO7DIR=/mnt/share/public/software/nbo7/bin
+export GAUNBO=$NBO7DIR/gaunbo6
 export CURR_DIR=*job_directory*
 
 mkdir -p /tmp/*job_name*

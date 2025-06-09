@@ -1,9 +1,7 @@
 import shutil
 from pathlib import Path
 import pandas as pd
-from sphinxcontrib.htmlhelp import template_dir
 
-from fod_analysis import xyz_path
 from utils import create_dirs, write_orca_input, write_batch_file, dir_empty, check_optimization_status
 
 
@@ -15,7 +13,7 @@ def main():
     jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
 
     for ligand_dir in jobs_dir.iterdir():
-        if not ligand_dir.is_dir():
+        if not ligand_dir.is_dir(): # or ligand_dir.name not in ["L31", "L32"]:
             continue
 
         ligand_name = ligand_dir.name
@@ -29,7 +27,7 @@ def main():
         for opt_conf_dir in ensemble_path.glob('conformer_*'):
             conf_name = opt_conf_dir.name
             num = int(conf_name.split("_")[-1])
-            job_name = f"{ligand_name}_{conf_name}_Single_Point"
+            job_name = f"{ligand_name}_{species}_Single_Point_conf{num}"
             conf_dir = sp_dir.joinpath(conf_name)
             orca_output = opt_conf_dir.joinpath("output",
                                                  f"output_{ligand_name}_CuOA_Ensemble_Opt_conf{num}.out")
@@ -55,7 +53,7 @@ def main():
                                          elprop="Quadrupole True,Polar 1",
                                          memory="1000")
 
-                        write_batch_file(job_name, conf_dir, new_xyz_path, memory="16GB", tasks_per_node=12)
+                        write_batch_file(job_name, conf_dir, new_xyz_path, memory="16GB", tasks_per_node=12, molden=True)
                         Path.mkdir(conf_dir.joinpath("output"), exist_ok=True)
 
                         print(f"Written single-point job for {ligand_name} to {conf_dir}")
