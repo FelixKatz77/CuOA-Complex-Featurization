@@ -14,7 +14,7 @@ from morfeus import BiteAngle, read_xyz, Dispersion
 from pymatgen.io.xyz import XYZ
 
 from utils import read_energy, check_orca_success, check_optimization_success, check_neg_frequencies, \
-    find_coordinating_atom_ids, find_atom_id, check_optimization_status
+    find_coordinating_atom_ids, find_atom_id, check_optimization_status, GEOMETRY_INPUT_DIR, JOBS_DIR
 
 
 def calculate_boltzmann_average(df, energy_col='Energy', T=298.15):
@@ -86,8 +86,8 @@ def calculate_dispersion(xyz_file):
     return {'p_int': p_int, 'p_min': p_min, 'p_max': p_max}
 
 if __name__ == '__main__':
-    template_dir = Path("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/geometries/input/")
-    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
+    template_dir = GEOMETRY_INPUT_DIR
+    jobs_dir = JOBS_DIR
     species = "CuOA"
     for ligand_dir in jobs_dir.iterdir():
         if ligand_dir.is_dir() and ligand_dir.name == sys.argv[1]: #and ligand_dir.name == sys.argv[1]:

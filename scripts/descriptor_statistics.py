@@ -1,7 +1,14 @@
+'''
+This script collects the electronic and steric descriptors of all ligands, 
+adds mean/max/min rows and ligand classes, and saves them to combined CSV files.
+'''
+
 import pandas as pd
 from pathlib import Path
 
-jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
+from utils import JOBS_DIR
+
+jobs_dir = JOBS_DIR
 
 ligand_classes = {
     "Symmetric Diamide": ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L31"],
@@ -28,7 +35,7 @@ def get_ligand_class(ligand_name):
     return ligand_to_class.get(ligand_name, 'Unknown')
 
 for i, ligand_dir in enumerate(jobs_dir.iterdir()):
-    if ligand_dir.is_dir():# and ligand_dir.name not in ["L21", "L17", "L18", "L4"]:
+    if ligand_dir.is_dir():
         ligand_name = ligand_dir.name
         elec_csv = ligand_dir.joinpath("electronic_descriptors", f"{ligand_name}_CuOA_electronic_descriptors.csv")
         steric_csv = ligand_dir.joinpath("steric_descriptors", f"{ligand_name}_CuOA_steric_descriptors.csv")
@@ -44,24 +51,23 @@ for i, ligand_dir in enumerate(jobs_dir.iterdir()):
         else:
             electronic_df = pd.concat([electronic_df, curr_elec_df])
             steric_df = pd.concat([steric_df, curr_steric_df])
+
 mean_elec_values = electronic_df.mean()
 max_elec_values = electronic_df.max()
 min_elec_values = electronic_df.min()
 electronic_df = pd.concat([electronic_df, mean_elec_values.to_frame(name="Mean").T, max_elec_values.to_frame(name="Max").T, min_elec_values.to_frame(name="Min").T])
-# Exclude ligands L21 and L24
-electronic_df = electronic_df[~electronic_df.index.str.contains('L21|L24')]
+
 #Add ligand classes to the electronic descriptors DataFrame
 electronic_df['Ligand Class'] = electronic_df.index.to_series().apply(lambda x: get_ligand_class(x.split('_')[0]))
-electronic_df.to_csv("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/electronic_descriptors_synthesized.csv")
+electronic_df.to_csv(JOBS_DIR / "electronic_descriptors_synthesized.csv")
 
 mean_steric_values = steric_df.mean()
 max_steric_values = steric_df.max()
 min_steric_values = steric_df.min()
 steric_df = pd.concat([steric_df, mean_steric_values.to_frame(name="Mean").T, max_steric_values.to_frame(name="Max").T, min_steric_values.to_frame(name="Min").T])
-# Exclude ligands L21 and L24
-steric_df = steric_df[~steric_df.index.str.contains('L21|L24')]
+
 #Add ligand classes to the electronic descriptors DataFrame
 steric_df['Ligand Class'] = steric_df.index.to_series().apply(lambda x: get_ligand_class(x.split('_')[0]))
-steric_df.to_csv("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/steric_descriptors_synthesized.csv")
+steric_df.to_csv(JOBS_DIR / "steric_descriptors_synthesized.csv")
 pass
 

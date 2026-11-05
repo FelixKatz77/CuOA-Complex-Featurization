@@ -1,22 +1,24 @@
+'''
+This script generates the Gaussian input and batch files for the NBO calculations 
+of each optimized conformer.
+'''
+
 from pathlib import Path
 
 import pandas as pd
 from sympy.physics.mechanics.tests.test_system import coordinates
 
-from utils import create_dirs, write_batch_file, dir_empty, write_gaussian_input, check_optimization_status
+from utils import create_dirs, write_batch_file, dir_empty, write_gaussian_input, check_optimization_status, LIGANDS_CSV, JOBS_DIR, GEOMETRY_INPUT_DIR
 
 if __name__ == '__main__':
-    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
-    template_dir = Path("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/geometries/input/")
-    ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
+    jobs_dir = JOBS_DIR
+    template_dir = GEOMETRY_INPUT_DIR
+    ligands_info = pd.read_csv(LIGANDS_CSV)
     species = "CuOA"
     for ligand_dir in jobs_dir.iterdir():
-        if ligand_dir.is_dir(): # and ligand_dir.name in ["L31", "L32"]:  # Specify the ligands you want to process
-            ligand_name = ligand_dir.name  # ligand_name of the ligand
-        else:
-            continue
+        ligand_name = ligand_dir.name  
         ligand_info = ligands_info[ligands_info["name"] == ligand_name]
-        charge = ligands_info["charge_complex"].values[0]
+        charge = ligand_info["charge_complex"].values[0]
         ensemble_path = jobs_dir.joinpath(ligand_name, "Ensemble_Opt", f"{ligand_name}_{species}_Ensemble_Opt")  # Path to ensemble directory
 
         nbo_dir = create_dirs(ligand_name, "NBO", "CuOA", jobs_dir, output=False)
@@ -29,6 +31,7 @@ if __name__ == '__main__':
             conf_nbo_dir = nbo_dir.joinpath(conf_name)
             try:
                 if conf_nbo_dir.joinpath("output").exists() and not dir_empty(conf_nbo_dir.joinpath("output")):
+                    #pass
                     raise FileExistsError
                 else:
                     orca_output = conf_opt_dir.joinpath("output",

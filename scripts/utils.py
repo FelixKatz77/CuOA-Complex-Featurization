@@ -1,3 +1,9 @@
+'''
+This module contains helper functions for writing ORCA/Gaussian inputs and batch files, 
+checking job outputs and handling geometries.
+'''
+
+
 import contextlib
 import os
 import sys
@@ -14,6 +20,12 @@ from openbabel import pybel
 from openbabel import openbabel
 import subprocess
 import re
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = REPO_ROOT / "data"
+GEOMETRY_INPUT_DIR = DATA_DIR / "geometries" / "input"
+LIGANDS_CSV = DATA_DIR / "Ligands.csv"
+JOBS_DIR = REPO_ROOT.parent / "jobs" / "featurization"
 
 def dir_empty(dir_path):
     path = Path(dir_path)
@@ -44,7 +56,7 @@ def create_dirs(name, job_type, species, jobs_path, output=True):
     return job_directory
 
 def write_orca_input(dir, job_name, **kwargs):
-    """Write ORCA input file for geometry optimization"""
+    '''Write ORCA input file for geometry optimization'''
 
     scf_type = kwargs.get('scf_type', '')
     method = kwargs.get('method', '')
@@ -91,6 +103,9 @@ def write_orca_input(dir, job_name, **kwargs):
         f.write(orca_input)
 
 def write_batch_file(job_name, job_directory, xyz_path, memory='4GB', tasks_per_node=12, template='submit.batch', molden=False):
+
+    '''Write batch file for SLURM'''
+
     batch_file = Path(template).read_text()
     batch_file = batch_file.replace('*job_name*', str(job_name))
     batch_file = batch_file.replace('*job_directory*', str(job_directory))
@@ -110,12 +125,12 @@ def is_transition_metal(at):
 
 def set_dative_bonds(mol, fromAtoms=(7,8)):
 
-    """ convert some bonds to dative
+    '''convert some bonds to dative
 
     Replaces some single bonds between metals and atoms with atomic numbers in fromAtoms
     with dative bonds. The replacement is only done if the atom has "too many" bonds.
 
-    Returns the modified molecule."""
+    Returns the modified molecule.'''
 
     pt = Chem.GetPeriodicTable()
     rwmol = Chem.RWMol(mol)
@@ -131,11 +146,15 @@ def set_dative_bonds(mol, fromAtoms=(7,8)):
     return rwmol
 
 def hartree_to_kcal_mol(hartree):
-    """Convert energy from Hartree to kcal/mol"""
+
+    '''Convert energy from Hartree to kcal/mol'''
+
     return hartree * 627.509  # Standard conversion factor
 
 def write_xyz_file(path, energy_kcal, atoms, coords):
-    """Write XYZ file with energy in comment line"""
+
+    '''Write XYZ file with energy in comment line'''
+
     path.write_text(
         f"{len(atoms)}\n"
         f"Energy (kcal/mol) = {energy_kcal:.2f}\n"
@@ -146,6 +165,7 @@ def write_xyz_file(path, energy_kcal, atoms, coords):
     )
 
 def find_atom_id(xyz_path, element):
+
     '''Find the atom ID for an element in an XYZ file'''
 
     input_text = xyz_path.read_text()
@@ -175,9 +195,11 @@ def read_energy(opt_out, single_out):
 
 
 def check_neg_frequencies(filename, verbose=False):
-    """
+
+    '''
     Reads vibrational frequency data from an output file and checks for negative frequencies.
-    """
+    '''
+
     frequencies = {}
     reading_freqs = False
 
@@ -216,9 +238,10 @@ def check_neg_frequencies(filename, verbose=False):
     return has_negative_freqs
 
 def check_orca_success(filename, verbose=False):
-    """
+
+    '''
     Reads the ORCA output file to check if the job was successful.
-    """
+    '''
 
     with open(filename, 'r') as file:
         content = file.read()
@@ -230,9 +253,10 @@ def check_orca_success(filename, verbose=False):
             return False
 
 def check_optimization_success(filename, verbose=False):
-    """
+
+    '''
     Reads the ORCA output file to check if the optimization was successful.
-    """
+    '''
 
     with open(filename, 'r') as file:
         content = file.read()
@@ -244,9 +268,10 @@ def check_optimization_success(filename, verbose=False):
             return True
         
 def run_command(cmd, cwd = None, shell = True):
-    """
+
+    '''
     Run a command in the shell and return the output.
-    """
+    '''
     result = subprocess.run(
         cmd,
         shell=shell,
@@ -258,12 +283,15 @@ def run_command(cmd, cwd = None, shell = True):
 
 
 def extract_floats(line):
-    """In a line of text, extract all numbers that include a decimal"""
+
+    '''In a line of text, extract all numbers that include a decimal'''
+
     float_pattern = r"[-+]?\d*\.\d+"
     matches = re.findall(float_pattern, line)
     return [float(match) for match in matches]
     
 def find_coordinating_atom_ids(cu_id, xyz_path):
+
     '''Find the atom IDs of the two N or O atoms closest to a given atom in an XYZ file. IDs are 0-indexed.'''
 
     mol = XYZ.from_file(xyz_path).molecule
@@ -302,6 +330,9 @@ def suppress_obabel_warnings():
         os.close(saved_stderr_fd)
 
 def molecule_to_graph(mol):
+
+    '''Represent molecule as graph'''
+
     G = nx.Graph()
     for atom in mol:
         G.add_node(atom.idx, element=atom.type)
@@ -314,6 +345,9 @@ def molecule_to_graph(mol):
     return G
 
 def check_connectivity(xyz_opt, xyz_temp, verbose=False):
+
+    '''Compare atom connectivity for two xyz files'''
+
     with suppress_obabel_warnings():
       mol_temp = next(pybel.readfile("xyz", str(xyz_temp)))
       mol_temp.OBMol.ConnectTheDots()
@@ -381,7 +415,9 @@ def extract_elements_and_coordinates(xyz_file):
 
 
 def write_gaussian_input(dir, job_name, xyz_path, charge, nprocs=12):
-    """Write Gaussian input file for NBO analysis"""
+
+    '''Write Gaussian input file for NBO analysis'''
+
     coordinates = extract_elements_and_coordinates(xyz_path)
     gaussian_input = f'%mem=12000MB\n%nprocshared={nprocs}\n#p TPSSTPSS/def2TZVP scf=XQC pop=(nbo6,hirshfeld,saveNBO)\n\n{job_name}\n\n{charge} 2\n'
     gaussian_input += f'{coordinates}\n\n'

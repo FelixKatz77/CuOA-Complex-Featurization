@@ -9,15 +9,14 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
-from utils import create_dirs, write_orca_input, write_batch_file
+from utils import create_dirs, write_orca_input, write_batch_file, LIGANDS_CSV, JOBS_DIR, GEOMETRY_INPUT_DIR
 
-species = 'Ligand'
-jobs_path = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
+species = 'CuOA'
+jobs_path = JOBS_DIR
 
-ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
-for xyz_file in Path("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/geometries/input/").glob("*.xyz"):
+ligands_info = pd.read_csv(LIGANDS_CSV)
+for xyz_file in GEOMETRY_INPUT_DIR.glob("*.xyz"):
     ligand_name = xyz_file.stem
-    #if ligand_name in ['L31', 'L32']:
     ligand_info = ligands_info[ligands_info["name"] == ligand_name]
     if species == "Ligand":
         charge = ligand_info["charge_ligand"].values[0]
@@ -40,11 +39,11 @@ for xyz_file in Path("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturiza
         shutil.copy(xyz_file, xyz_path)
 
     write_orca_input(job_directory, job_directory.stem,
-                     method="XTB GOAT",
-                     charge=charge,
-                     multiplicity=multiplicity,
-                     goat_options="MAXEN 3.5",
-                     n_procs='12',
-                     memory='1000')
+                        method="XTB GOAT",
+                        charge=charge,
+                        multiplicity=multiplicity,
+                        goat_options="MAXEN 3.5",
+                        n_procs='12',
+                        memory='1000')
 
     write_batch_file(job_name, job_directory, xyz_path, memory="16GB", tasks_per_node=12)

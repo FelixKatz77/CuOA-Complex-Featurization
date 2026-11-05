@@ -1,18 +1,22 @@
+'''
+This script generates the ORCA input and batch files for the oxidized and 
+reduced single-point calculations (E_ox/E_red) of each optimized conformer.
+'''
+
+
 import shutil
 from pathlib import Path
 
 import pandas as pd
 
-from utils import create_dirs, dir_empty, write_orca_input, write_batch_file, check_optimization_status
+from utils import create_dirs, dir_empty, write_orca_input, write_batch_file, check_optimization_status, LIGANDS_CSV, JOBS_DIR, GEOMETRY_INPUT_DIR
 
 if __name__ == "__main__":
 
-    ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
-    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
-    template_dir = Path("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/geometries/input/")
+    ligands_info = pd.read_csv(LIGANDS_CSV)
+    jobs_dir = JOBS_DIR
+    template_dir = GEOMETRY_INPUT_DIR
     for ligand_dir in jobs_dir.iterdir():
-        if not ligand_dir.is_dir() or ligand_dir.name not in ["L31", "L32"]:
-            continue
         ligand_name = ligand_dir.name
         ligand_info = ligands_info[ligands_info["name"] == ligand_name]
         charge = ligand_info["charge_complex"].values[0]

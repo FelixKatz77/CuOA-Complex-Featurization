@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#SBATCH --nodes 1
+#SBATCH --ntasks-per-node 6
+#SBATCH --time=48:00:00
+#SBATCH --job-name elec_descriptors
+#SBATCH --output output.dat
+
+# Set variables from arguments
+export JOB_NAME=$1
+
+conda init
+source .bashrc
+source activate base
+conda activate /home/employee/f_katz01/Software/miniconda3/envs/pyscf
+
+python electronic_descriptors.py $JOB_NAME

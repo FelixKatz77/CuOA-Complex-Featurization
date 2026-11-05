@@ -4,7 +4,7 @@ This script reads the final ensemble from GOAT and writes input files for each c
 
 from pathlib import Path
 import pandas as pd
-from utils import create_dirs, write_orca_input, write_batch_file, hartree_to_kcal_mol, write_xyz_file, dir_empty
+from utils import create_dirs, write_orca_input, write_batch_file, hartree_to_kcal_mol, write_xyz_file, dir_empty, LIGANDS_CSV, JOBS_DIR
 
 
 def parse_conformers(input_text):
@@ -36,21 +36,19 @@ def parse_conformers(input_text):
 
 def main():
     n_jobs = 0
-    species = 'Ligand'
-    ligands_info = pd.read_csv("/home/employee/f_katz01/Research/PlateOpt/ComplexFeaturization/data/Ligands.csv")
-    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
+    species = 'CuOA'
+    ligands_info = pd.read_csv(LIGANDS_CSV)
+    jobs_dir = JOBS_DIR
     for ligand_dir in jobs_dir.iterdir():
-        if ligand_dir.is_dir(): #and ligand_dir.name in ["L31", "L32"]:
-            ligand_name = ligand_dir.name
-            ligand_info = ligands_info[ligands_info["name"] == ligand_name]
-            if species == "Ligand":
-                charge = ligand_info["charge_ligand"].values[0]
-                multiplicity = ligand_info["multiplicity_ligand"].values[0]
-            else:
-                charge = ligand_info["charge_complex"].values[0]
-                multiplicity = ligand_info["multiplicity_complex"].values[0]
+        
+        ligand_name = ligand_dir.name
+        ligand_info = ligands_info[ligands_info["name"] == ligand_name]
+        if species == "Ligand":
+            charge = ligand_info["charge_ligand"].values[0]
+            multiplicity = ligand_info["multiplicity_ligand"].values[0]
         else:
-            continue
+            charge = ligand_info["charge_complex"].values[0]
+            multiplicity = ligand_info["multiplicity_complex"].values[0]
 
 
 

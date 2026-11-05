@@ -13,7 +13,7 @@ import sys
 from pymatgen.io.xyz import XYZ
 
 from steric_descriptors import calculate_boltzmann_average
-from utils import find_atom_id, find_coordinating_atom_ids, run_command, extract_floats, read_energy
+from utils import find_atom_id, find_coordinating_atom_ids, run_command, extract_floats, read_energy, JOBS_DIR
 import numpy as np
 import os
 import re
@@ -459,7 +459,7 @@ def calculate_e_ox_red(freq_base, sp_base, freq_ox, sp_ox, freq_red,sp_red):
 
 
 if __name__ == '__main__':
-    jobs_dir = Path("/home/employee/f_katz01/Research/PlateOpt/jobs/featurization/")
+    jobs_dir = JOBS_DIR
     species = "CuOA"
     for ligand_dir in jobs_dir.iterdir():
         if ligand_dir.is_dir() and ligand_dir.name == sys.argv[1]:
