@@ -11,7 +11,7 @@ from utils import JOBS_DIR
 jobs_dir = JOBS_DIR
 
 ligand_classes = {
-    "Symmetric Diamide": ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L31"],
+    "Symmetric Diamide": ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L31", "L33"],
     "Asymmetric Diamide": ["L9", "L10"],
     "Phenanthrolinē": ["L11", "L12", "L13", "L14"],
     "Dipyrrazole": ["L15", "L16", "L17"],
@@ -69,5 +69,5 @@ steric_df = pd.concat([steric_df, mean_steric_values.to_frame(name="Mean").T, ma
 #Add ligand classes to the electronic descriptors DataFrame
 steric_df['Ligand Class'] = steric_df.index.to_series().apply(lambda x: get_ligand_class(x.split('_')[0]))
 steric_df.to_csv(JOBS_DIR / "steric_descriptors_synthesized.csv")
-pass
+
 

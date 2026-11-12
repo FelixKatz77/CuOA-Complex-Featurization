@@ -1,0 +1,11 @@
+﻿Name,SMILES,pKa (H2O),Ref
+NaOtBu,[Na+].CC(C)(C)[O-],17,https://organicchemistrydata.org/hansreich/resources/pka/pka_data/evans_pKa_table.pdf
+K3PO4,[K+].[K+].[K+].[O-]P(O)(O)=O,12.32,https://organicchemistrydata.org/hansreich/resources/pka/pka_data/pka-compilation-williams.pdf
+KOMe ,[K+].C[O-],15.5,https://organicchemistrydata.org/hansreich/resources/pka/pka_data/evans_pKa_table.pdf
+Cs2CO3,[Cs+].[Cs+].[O-]C([O-])=O,10.33,https://organicchemistrydata.org/hansreich/resources/pka/pka_data/pka-compilation-williams.pdf
+K2CO3 ,[K+].[K+].[O-]C([O-])=O,10.33,https://organicchemistrydata.org/hansreich/resources/pka/pka_data/pka-compilation-williams.pdf
+KOtBu,[K+].CC(C)(C)[O-],17,https://organicchemistrydata.org/hansreich/resources/pka/pka_data/evans_pKa_table.pdf
+DBU ,C1CCN2CCCN=C2CC1,13.5,https://pubs.acs.org/doi/10.1021/acs.oprd.9b00187
+DBN,C1CN=C2CCCN2C1,13.42,https://www.chemicalbook.com/ChemicalProductProperty_DE_CB6322458.htm
+TMG,CN(C)C(=N)N(C)C,13,https://pubs.acs.org/doi/10.1021/acs.oprd.9b00187
+TBD,C1CNC2=NCCCN2C1,15.2,https://pubs.acs.org/doi/10.1021/acs.oprd.9b00187
