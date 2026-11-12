@@ -82,7 +82,7 @@ def calc_front_orb_derived_descriptors(e_homo, e_lumo):
 
     homo_lumo_gap = e_lumo - e_homo
     molecular_electronegativity = (e_lumo + e_homo) / 2
-    global_electrophilicity = molecular_electronegativity ** 2 / 2 * homo_lumo_gap
+    global_electrophilicity = molecular_electronegativity ** 2 / (2 * homo_lumo_gap)
     global_nucleophilicity = 1 / global_electrophilicity
     return {'HOMO-LUMO gap': homo_lumo_gap, 'Molecular electronegativity': molecular_electronegativity,
             'Global electrophilicity parameter': global_electrophilicity,
